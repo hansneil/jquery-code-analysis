@@ -144,10 +144,10 @@ jQuery.fn = jQuery.prototype = {
 		/**
 		 * 处理如果传入的是字符串
 		 * case 1:
-		 * 		如果是HTML代码,通过selector.charAt(0)以及selector.charAt(selector.length-1)来判断,此外还要确保selector长度大于等于3
-		 * 	    防止<>的情况
+		 *     如果是HTML代码,通过selector.charAt(0)以及selector.charAt(selector.length-1)来判断,此外还要确保selector长度大于等于3
+		 *     防止<>的情况
 		 * case 2:
-		 * 		如果不是HTML标签,则进行正则表达式检查,用于检测是否是HTML标签或者是ID选择器
+		 *     如果不是HTML标签,则进行正则表达式检查,用于检测是否是HTML标签或者是ID选择器
 		 */
 		if ( typeof selector === "string" ) {
 			// Are we dealing with HTML string or an ID?
