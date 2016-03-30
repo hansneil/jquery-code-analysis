@@ -29,10 +29,17 @@ var document = window.document,
 	navigator = window.navigator,
 	location = window.location;
 
+/**
+ * 构造jQuery对象
+ */
 //这里定义jQuery对象,使用私有作用域来创建一个模块
 var jQuery = (function() {
 
 // Define a local copy of jQuery
+/**
+ * 定义一些局部变量
+ * 这里的jQuery对象的值是构造函数,在自调用匿名函数最后返回了这个对象, 因此36行和43行的jQuery对象是等价的,都是指向构造函数
+ */
 var jQuery = function( selector, context ) {
 		// The jQuery object is actually just the init constructor 'enhanced'
 		// 这里返回一个new创建的另外一个构造函数的实例,这样就省略了之后调用jQuery时附加new,可以直接调用jQuery()
@@ -111,27 +118,43 @@ var jQuery = function( selector, context ) {
 	class2type = {};
 //这里jQuery.fn是prototype的简写,可以简化调用
 //这里直接覆盖了jQuery的原型,所以这里指定了constructor
+/**
+ * 第一部分:关于jQuery构造函数, 原型属性和方法
+ */
 jQuery.fn = jQuery.prototype = {
 	constructor: jQuery,
 	//实际jQuery对象是这个函数创建的jQuery对象数组
+	/**
+	 * init函数是实际的jQuery构造函数
+	 * @param selector
+	 * @param context
+	 * @param rootjQuery
+     * @returns {*}
+     */
 	init: function( selector, context, rootjQuery ) {
 		var match, elem, ret, doc;
 
 		// Handle $(""), $(null), or $(undefined)
 		//如果传入的selector为空,则返回jQuery对象
+		//case1: $() 没有传参数或者参数是null/undefined,则返回空的jQuery对象
 		if ( !selector ) {
 			return this;
 		}
 
 		//如果传入的是DOM元素,简单记录selector,将长度置为1,返回封装DOM元素的jQuery对象
 		// Handle $(DOMElement)
+		//case2: $(element)
+		// 这里说明了两个问题: 第一: 将DOM元素转化为jQuery元素: 通过向jQuery构造函数传递DOM元素即可
+		// 而反过来,由于jQuery对象的[0]保存了构造jQuery对象时的DOM元素,因此$(ele)[0]可以转化为DOM对象
 		if ( selector.nodeType ) {
+			//这里把selector,也就是element赋值给了this[0],这就是为什么jQuery对象转化为DOM对象时用的是 var ele = $(ele)[0]
 			this.context = this[0] = selector;
 			this.length = 1;
 			return this;
 		}
 
 		// The body element only exists once, optimize finding it
+		//case2: $(body)
 		if ( selector === "body" && !context && document.body ) {
 			this.context = document;
 			this[0] = document.body;
@@ -141,6 +164,8 @@ jQuery.fn = jQuery.prototype = {
 		}
 
 		// Handle HTML strings
+		// case3: $(selector[, context])
+		// case4: $(html[, contex]) or $(html[, prop])
 		/**
 		 * 处理如果传入的是字符串
 		 * case 1:
@@ -172,70 +197,108 @@ jQuery.fn = jQuery.prototype = {
 				// HANDLE: $(html) -> $(array)
 				if ( match[1] ) {
 					//对于$("<div>")context就是null
+					//对于$('div.foo').click(function(){
+					//     $('span', this).addClass(..)//这里的context就是this,即div.foo元素
+					// })
 					context = context instanceof jQuery ? context[0] : context;
 					//获得相应的根文档,如果设置了则为context, 否则就是document
 					doc = ( context ? context.ownerDocument || context : document );
 
 					// If a single string is passed in and it's a single tag
 					// just do a createElement and skip the rest
+					//判断是否是单标签
 					ret = rsingleTag.exec( selector );
 
 					if ( ret ) {
+						//如果判断为单标签,则调用createElement
+						//需要这样判断的原因:
+						//jQuery支持jQuery(html, context)或者jQuery(html, props)
+						//这里需要做的就是排除第一种情况,因为第一种传入的其实是选择器上下文
 						if ( jQuery.isPlainObject( context ) ) {
 							selector = [ document.createElement( ret[1] ) ];
+							//由于这种情况是jQuery(html, prop),因此在创建完DOM元素后需要配置相应的属性
+							//相应的属性通过attr配置
 							jQuery.fn.attr.call( selector, context, true );
 
 						} else {
+							//根据相应的上下文创建元素
+							//注意这里的selector是一个数组
 							selector = [ doc.createElement( ret[1] ) ];
 						}
 
 					} else {
+						//如果不是单标签,则调用fragment来创建
 						ret = jQuery.buildFragment( [ match[1] ], [ doc ] );
+						//这里为什么要用childNodes,因为fragment并不是DOM的一部分
+						//而childNodes是类数组对象,因此也是一个数组
 						selector = ( ret.cacheable ? jQuery.clone(ret.fragment) : ret.fragment ).childNodes;
 					}
-
+					//这里merge就是将jQuery对象和selector对象组合在一起,即返回一个包含引用DOM元素的jQuery对象
+					/*console.log(jQuery.merge( this, selector).addClass('haha'));*/
 					return jQuery.merge( this, selector );
 
 				// HANDLE: $("#id")
+				// 前面已经分析过如果match[1]不是undefined,说明就是html标签,但如果是undefined,那传入的就是id了
 				} else {
+					//通过js原生代码查找获得DOM元素,注意这里是match[2],捕获组2
 					elem = document.getElementById( match[2] );
 
 					// Check parentNode to catch when Blackberry 4.6 returns
 					// nodes that are no longer in the document #6963
+					// 判断找到的元素是否还在文档中
 					if ( elem && elem.parentNode ) {
 						// Handle the case where IE and Opera return items
 						// by name instead of ID
+						//确保id号和找到的DOM元素的id一致,因为有可能IE和Opera会用name来充当id
 						if ( elem.id !== match[2] ) {
+							//这里的rootjQuery是document,从1013行可以看出[大概附近]
+							//如果id号不等于selector的id,则在document中重新调用find函数查找
 							return rootjQuery.find( selector );
 						}
 
 						// Otherwise, we inject the element directly into the jQuery object
 						this.length = 1;
+						//这里也同样将DOM对象存储在this[0]
 						this[0] = elem;
 					}
 
 					this.context = document;
-					this.selector = selector;
+					this.selector = selector;//通过一个selector属性保存id号,例如#selector
 					return this;
 				}
 
 			// HANDLE: $(expr, $(...))
 			} else if ( !context || context.jquery ) {
+				//第一种情况:这里接收类似$(".text")等方式创建jQuery对象,这种方式context为null/undefined
+				//第二种情况:上下文传递的是jQuery对象,jQuery对象都会包含一个jquery属性来代表jQuery的版本,如$('.text' $(document))
+				//这两种情况,可以直接用context或者$(document)作为根元素进行查找,而无需将context转化为jQuery对象
 				return ( context || rootjQuery ).find( selector );
 
 			// HANDLE: $(expr, context)
 			// (which is just equivalent to: $(context).find(expr)
 			} else {
+				//这里如果传递的context不是一个jQuery对象,则先要调用构造函数来将其转化为jQuery对象
+				//这个方法就类似于$(context) or jQuery(context) .find(),因为this.constructor指向jQuery构造函数
+				//$('.text', document)
 				return this.constructor( context ).find( selector );
 			}
 
+		//case5: $(callback)
 		// HANDLE: $(function)
 		// Shortcut for document ready
+		// 如果传入的是一个回调函数,就满足$(callback)的情况,这是$(document).ready的简写, ready就是文档加载完成,其实现就是
+		// document.readyState = 'complete'/DOMContentLoad/load...
 		} else if ( jQuery.isFunction( selector ) ) {
 			return rootjQuery.ready( selector );
 		}
 
+		//如果传入的不是字符串
+		//case6: $(jQuery object)
+		//case7: $(Object)
+		//情况一: 传入的是jQuery对象
+		//情况二: 传入的是一般的对象,非DOM
 		if ( selector.selector !== undefined ) {
+			//这里说明传入的是一个jQuery对象,因此返回一个拷贝
 			this.selector = selector.selector;
 			this.context = selector.context;
 		}
@@ -321,6 +384,8 @@ jQuery.fn = jQuery.prototype = {
 
 	eq: function( i ) {
 		i = +i;
+		// +i的目的是将i转化为 Number 类型
+		// eq的目的则是获得相应的项,如果eq[0]就是转化为相应的DOM对象
 		return i === -1 ?
 			this.slice( i ) :
 			this.slice( i, i + 1 );
@@ -360,6 +425,9 @@ jQuery.fn = jQuery.prototype = {
 // 这里用jQuery.fn[jQuery的原型]覆盖了jQuery.fn.init的原型,这就是为什么jQuery()返回的是jQuery.fn.init的实例,但仍然可以调用相应的jQuery方法
 jQuery.fn.init.prototype = jQuery.fn;
 
+/**
+ * 定义jQuery的extend方法, 用于合并两个或多个对象到第一个对象
+ */
 jQuery.extend = jQuery.fn.extend = function() {
 	var options, name, src, copy, copyIsArray, clone,
 		target = arguments[0] || {},
@@ -424,6 +492,9 @@ jQuery.extend = jQuery.fn.extend = function() {
 	return target;
 };
 
+/**
+ * 在jQuery构造函数上定义静态属性和方法, 即扩展了jQuery对象实例
+ */
 jQuery.extend({
 	noConflict: function( deep ) {
 		if ( window.$ === jQuery ) {
@@ -554,12 +625,15 @@ jQuery.extend({
 		// Must be an Object.
 		// Because of IE, we also have to check the presence of the constructor property.
 		// Make sure that DOM nodes and window objects don't pass through, as well
+		//检测是否是一个对象,不能是DOM节点或者window对象,必须是一个普通对象
 		if ( !obj || jQuery.type(obj) !== "object" || obj.nodeType || jQuery.isWindow( obj ) ) {
 			return false;
 		}
 
 		try {
 			// Not own constructor property must be Object
+			//hasOwn ==> Object.prototype.hasOwnProperty
+			//这个对象不能有constructor属性
 			if ( obj.constructor &&
 				!hasOwn.call(obj, "constructor") &&
 				!hasOwn.call(obj.constructor.prototype, "isPrototypeOf") ) {
@@ -730,9 +804,11 @@ jQuery.extend({
 			// Tweaked logic slightly to handle Blackberry 4.7 RegExp issues #6930
 			var type = jQuery.type( array );
 
+			//如果array只是字符串,函数或者正则表达式,则直接将其push到ret中作为一个属性
 			if ( array.length == null || type === "string" || type === "function" || type === "regexp" || jQuery.isWindow( array ) ) {
 				push.call( ret, array );
 			} else {
+				//如果是对象则进行merge
 				jQuery.merge( ret, array );
 			}
 		}
@@ -4182,6 +4258,7 @@ Sizzle.find = function( expr, context, isXML ) {
 		return [];
 	}
 
+	//order=["ID", "NAME", "TAG"]
 	for ( i = 0, len = Expr.order.length; i < len; i++ ) {
 		type = Expr.order[i];
 
@@ -4470,6 +4547,7 @@ var Expr = Sizzle.selectors = {
 				var m = context.getElementById(match[1]);
 				// Check parentNode to catch when Blackberry 4.6 returns
 				// nodes that are no longer in the document #6963
+				// 首先判断m存在,然后判断m不是僵尸节点,即仍在文档中
 				return m && m.parentNode ? [m] : [];
 			}
 		},

@@ -5,15 +5,45 @@
     <title>jQuery</title>
 </head>
 <body>
+<div id="bar">
+    <div class="text"></div>
+</div>
 <script src="jquery-1.7.2.js"></script>
 <script>
+$(function() {
     /*$('<div/>', {
         "class": "text",
         text: "Hello World"
-    }).appendTo("body");*/
+    }).appendTo("body");
 
-    var jQuery = $("<div></div>");
+    console.log($('#bar').selector);
+    console.log($('#bar').context);
+    console.log($('.text', $(document)));
+    console.log($(document).jquery);
+
+    //ready写法一
+    $(document).ready(function () {
+        alert('ready');
+    })
+    //ready写法二
+    $(function () {
+        alert('ready too');
+    })*/
+
+    /*var jQuery = $("<div></div>");*/
     /*console.log(jQuery.length)*/
+    /*var bar = document.getElementById("bar");
+    $(bar);
+    $('.text', bar);
+    console.log($('body'));
+    var $bar = $($(bar));*/
+
+   /* var $div = $("#div");
+    var $divClone = $($div);
+    console.log($divClone.selector)*/
+    /*$(".text");*/
+    $('#bar').get(0).style.height= "100px";
+});
 </script>
 </body>
 </html>
