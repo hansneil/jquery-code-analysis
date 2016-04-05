@@ -228,6 +228,7 @@ jQuery.fn = jQuery.prototype = {
 
 					} else {
 						//如果不是单标签,则调用fragment来创建
+						console.log(match[1], doc);
 						ret = jQuery.buildFragment( [ match[1] ], [ doc ] );
 						//这里为什么要用childNodes,因为fragment并不是DOM的一部分
 						//而childNodes是类数组对象,因此也是一个数组
@@ -1095,7 +1096,7 @@ function doScrollCheck() {
 
 return jQuery;
 
-})();//添加自调用函数,可以降低jQuery对象和其他对象的耦合
+})();//添加自调用函数,形成了局部作用域,可以降低jQuery对象和其他对象的耦合
 
 
 // String to Object flags format cache
@@ -1597,9 +1598,11 @@ jQuery.support = (function() {
 
 	// Check if a radio maintains its value
 	// after being appended to the DOM
+	// 这里居然在创建元素, 用来检测checked属性在append之后会不会改变
 	input = document.createElement("input");
 	input.value = "t";
 	input.setAttribute("type", "radio");
+	//这里首先检测,在把一个input设为radio之后它的value是不是可以保存
 	support.radioValue = input.value === "t";
 
 	input.setAttribute("checked", "checked");
@@ -1612,6 +1615,7 @@ jQuery.support = (function() {
 	fragment.appendChild( div.lastChild );
 
 	// WebKit doesn't clone checked state correctly in fragments
+	// true表示是否深拷贝
 	support.checkClone = fragment.cloneNode( true ).cloneNode( true ).lastChild.checked;
 
 	// Check if a disconnected checkbox will retain its checked
@@ -5857,6 +5861,7 @@ var nodeNames = "abbr|article|aside|audio|bdi|canvas|data|datalist|details|figca
 	rtbody = /<tbody/i,
 	rhtml = /<|&#?\w+;/,
 	rnoInnerhtml = /<(?:script|style)/i,
+	//如果是script/object/embed/option/style这些标签,就不创建cache
 	rnocache = /<(?:script|object|embed|option|style)/i,
 	rnoshimcache = new RegExp("<(?:" + nodeNames + ")[\\s/>]", "i"),
 	// checked="checked" or checked
@@ -6308,13 +6313,16 @@ function cloneFixAttributes( src, dest ) {
 	dest.removeAttribute( "_change_attached" );
 }
 
+//[ match[1] ], [ doc ]
 jQuery.buildFragment = function( args, nodes, scripts ) {
 	var fragment, cacheable, cacheresults, doc,
 	first = args[ 0 ];
+	console.log(args[0]);
 
 	// nodes may contain either an explicit document object,
 	// a jQuery collection or context object.
 	// If nodes[0] contains a valid object to assign to doc
+	// 修正doc步骤一
 	if ( nodes && nodes[0] ) {
 		doc = nodes[0].ownerDocument || nodes[0];
 	}
@@ -6322,6 +6330,7 @@ jQuery.buildFragment = function( args, nodes, scripts ) {
 	// Ensure that an attr object doesn't incorrectly stand in as a document object
 	// Chrome and Firefox seem to allow this to occur and will throw exception
 	// Fixes #8950
+	// 修正doc步骤二
 	if ( !doc.createDocumentFragment ) {
 		doc = document;
 	}
@@ -6331,6 +6340,7 @@ jQuery.buildFragment = function( args, nodes, scripts ) {
 	// IE 6 doesn't like it when you put <object> or <embed> elements in a fragment
 	// Also, WebKit does not clone 'checked' attributes on cloneNode, so don't cache
 	// Lastly, IE6,7,8 will not correctly reuse cached fragments that were created from unknown elems #10501
+	//如果满足cache条件,转换后的DOM对象会被存放到jQuery缓存对象中
 	if ( args.length === 1 && typeof first === "string" && first.length < 512 && doc === document &&
 		first.charAt(0) === "<" && !rnocache.test( first ) &&
 		(jQuery.support.checkClone || !rchecked.test( first )) &&
@@ -6338,17 +6348,21 @@ jQuery.buildFragment = function( args, nodes, scripts ) {
 
 		cacheable = true;
 
+		//检测在fragments缓存中是否已经存在需要创建的标签了,如果存在则直接返回相应DOM片段即可
 		cacheresults = jQuery.fragments[ first ];
 		if ( cacheresults && cacheresults !== 1 ) {
 			fragment = cacheresults;
 		}
 	}
 
+	//如果不存在,则重新创建
 	if ( !fragment ) {
 		fragment = doc.createDocumentFragment();
+		//调用clean将HTML代码转化为DOM元素,并存储在创建的fragment中
 		jQuery.clean( args, doc, fragment, scripts );
 	}
 
+	//啥意思啊
 	if ( cacheable ) {
 		jQuery.fragments[ first ] = cacheresults ? fragment : 1;
 	}
