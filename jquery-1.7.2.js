@@ -185,6 +185,7 @@ jQuery.fn = jQuery.prototype = {
 				//这里返回的结果,如果match[1]不是undefined,则说明是HTML标签
 				match = quickExpr.exec( selector );
 			}
+			console.log(match);
 
 			/**
 			 * 验证match,看它是否是HTML标签
@@ -228,7 +229,6 @@ jQuery.fn = jQuery.prototype = {
 
 					} else {
 						//如果不是单标签,则调用fragment来创建
-						console.log(match[1], doc);
 						ret = jQuery.buildFragment( [ match[1] ], [ doc ] );
 						//这里为什么要用childNodes,因为fragment并不是DOM的一部分
 						//而childNodes是类数组对象,因此也是一个数组
@@ -5839,7 +5839,10 @@ function winnow( elements, qualifier, keep ) {
 
 
 function createSafeFragment( document ) {
+	//nodeNames包含了html5的标签
 	var list = nodeNames.split( "|" ),
+	//在传入的document上创建一个新片段,然后在该文档片段上一次创建html5元素
+	//从而教会不能识别html5的浏览器可以正确地解析和渲染html5标签
 	safeFrag = document.createDocumentFragment();
 
 	if ( safeFrag.createElement ) {
@@ -5869,6 +5872,7 @@ var nodeNames = "abbr|article|aside|audio|bdi|canvas|data|datalist|details|figca
 	rscriptType = /\/(java|ecma)script/i,
 	rcleanScript = /^\s*<!(?:\[CDATA\[|\-\-)/,
 	wrapMap = {
+		//这里select为什么要设置成multiple,因为如果不设置的话,第一项option会被默认为selected
 		option: [ 1, "<select multiple='multiple'>", "</select>" ],
 		legend: [ 1, "<fieldset>", "</fieldset>" ],
 		thead: [ 1, "<table>", "</table>" ],
@@ -6317,7 +6321,6 @@ function cloneFixAttributes( src, dest ) {
 jQuery.buildFragment = function( args, nodes, scripts ) {
 	var fragment, cacheable, cacheresults, doc,
 	first = args[ 0 ];
-	console.log(args[0]);
 
 	// nodes may contain either an explicit document object,
 	// a jQuery collection or context object.
@@ -6341,14 +6344,21 @@ jQuery.buildFragment = function( args, nodes, scripts ) {
 	// Also, WebKit does not clone 'checked' attributes on cloneNode, so don't cache
 	// Lastly, IE6,7,8 will not correctly reuse cached fragments that were created from unknown elems #10501
 	//如果满足cache条件,转换后的DOM对象会被存放到jQuery缓存对象中
+	//args的长度必须为1,且args[0]必须是字符串,字符串长度不超过512Bytes,否则可能会导致内存占用过大
+	//只缓存当前文档的DOM元素
+	//只缓存DOM元素,不缓存文本节点,不缓存<script><object><embed><option><style>元素
+	//当前浏览器可以正确复制单选按钮和复选框的选中状态 或者 HTML代码中的单选按钮和复选框没有被选中
+	//当前浏览器可以正确复制html5标签 或者 HTML代码中不含有html5标签
 	if ( args.length === 1 && typeof first === "string" && first.length < 512 && doc === document &&
 		first.charAt(0) === "<" && !rnocache.test( first ) &&
 		(jQuery.support.checkClone || !rchecked.test( first )) &&
 		(jQuery.support.html5Clone || !rnoshimcache.test( first )) ) {
 
+		//这是一个非常重要的参照值,如果为true,转换后的DOM元素必须先复制一份再使用
 		cacheable = true;
 
 		//检测在fragments缓存中是否已经存在需要创建的标签了,如果存在则直接返回相应DOM片段即可
+		//尝试从缓存中读取缓存的DOM元素
 		cacheresults = jQuery.fragments[ first ];
 		if ( cacheresults && cacheresults !== 1 ) {
 			fragment = cacheresults;
@@ -6356,14 +6366,22 @@ jQuery.buildFragment = function( args, nodes, scripts ) {
 	}
 
 	//如果不存在,则重新创建
+	//1.HTML代码不符合缓存条件
+	//2.HTML代码符合缓存条件,但第一次创建,不存在相应的缓存
+	//3.HTML代码符合缓存条件,但第二次创建,缓存值为1
 	if ( !fragment ) {
+		//创建文档片段
 		fragment = doc.createDocumentFragment();
 		//调用clean将HTML代码转化为DOM元素,并存储在创建的fragment中
 		jQuery.clean( args, doc, fragment, scripts );
 	}
 
-	//啥意思啊
+	//把转换后的DOM元素存放至缓存对象jQuery.fragments中
 	if ( cacheable ) {
+		//转换情况		before		after
+		//第一次转换		不存在	  	  1
+		//第二次转换		  1			文档片段
+		//两次以上转换	文档片段 		文档片段
 		jQuery.fragments[ first ] = cacheresults ? fragment : 1;
 	}
 
@@ -6493,10 +6511,15 @@ jQuery.extend({
 		return clone;
 	},
 
+	// 负责将HTML代码转化为DOM元素, 并提取其中的script元素
+	// 方法: 创建一个div元素,并插入到安全的文档片段中, 然后将HTML代码赋值给div的innerHTML, 浏览器会自动生成DOM元素.
+	//      最后解析div的子元素得到转化后的DOM元素
 	clean: function( elems, context, fragment, scripts ) {
 		var checkScriptType, script, j,
 				ret = [];
 
+		//修正context: 这里进行修正的原因——为了方便clean方法被直接调用
+		//确定上下文,如果没有指定上下文就是document
 		context = context || document;
 
 		// !context.createElement fails in IE with an error but returns typeof 'object'
@@ -6504,8 +6527,10 @@ jQuery.extend({
 			context = context.ownerDocument || context[0] && context[0].ownerDocument || document;
 		}
 
+		//这里的for循环很巧妙,避免了length比较,而是通过判断elem的有效性来判断数组是否到达尾部
 		for ( var i = 0, elem; (elem = elems[i]) != null; i++ ) {
 			if ( typeof elem === "number" ) {
+				//如果elem是数值类型,则自加空字符串来转化为字符串类型
 				elem += "";
 			}
 
@@ -6515,51 +6540,73 @@ jQuery.extend({
 
 			// Convert html string into DOM nodes
 			if ( typeof elem === "string" ) {
+				//如果判断不是DOM元素,则创建文本节点
+				//rhtml包括三类, 标签'<' 字符代码 '&' 数字代码 '&#'
+				//createTextNode无法将字符代码或者数字代码解析成正确的符号,但innerHTML可以
 				if ( !rhtml.test( elem ) ) {
 					elem = context.createTextNode( elem );
 				} else {
 					// Fix "XHTML"-style tags in all browsers
+					//修正自关闭的标签, 比如<div><p /></div>被修正为<div><p></p></div>
 					elem = elem.replace(rxhtmlTag, "<$1></$2>");
 
 					// Trim whitespace, otherwise indexOf won't work as expected
+					//获得elem的标签名
 					var tag = ( rtagName.exec( elem ) || ["", ""] )[1].toLowerCase(),
+					//确定是否需要有wrapper,没有则为default,[0, "", ""],在插入div之前必须先添加临时的父元素
 						wrap = wrapMap[ tag ] || wrapMap._default,
-						depth = wrap[0],
+						depth = wrap[0],//包裹深度,此后根据这个变量来剥去临时添加的父元素
+					//创建一个临时的div,稍后将其添加到安全文档片段中
 						div = context.createElement("div"),
 						safeChildNodes = safeFragment.childNodes,
 						remove;
+					console.log(wrap);
 
 					// Append wrapper element to unknown element safe doc fragment
+					//由于获得的safeFragment是基于document的,因此需要首先判断context是不是document的
+					//所谓安全的片段: 指不支持html5的浏览器能够正确解析和渲染未知的html5标签
+					//教会浏览器识别未知标签的方法,在你使用标签前使用document.createElement('未知标签')创建一个DOM元素
 					if ( context === document ) {
 						// Use the fragment we've already created for this document
+						//将临时创建的div元素添加到safeFragment中
 						safeFragment.appendChild( div );
 					} else {
 						// Use a fragment created with the owner document
+						//如果不是document则创建特定context的安全片段
 						createSafeFragment( context ).appendChild( div );
 					}
 
 					// Go to html and back, then peel off extra wrappers
+					//利用innerHTML机制将HTML代码转化为DOM元素, 首先为html代码包裹必要地父标签
 					div.innerHTML = wrap[1] + elem + wrap[2];
 
 					// Move to the right depth
+					//利用之前定义地depth变量,一层层剥去父标签, 得到需要转换地DOM元素
 					while ( depth-- ) {
 						div = div.lastChild;
 					}
 
 					// Remove IE's autoinserted <tbody> from table fragments
+					//确保没有自动添加tbody元素,IE有可能会自动向空的table中添加tbody元素.
+					//这里如果返回false,则说明自动添加了tbody,因为正常情况下已经在上一步被剥除
 					if ( !jQuery.support.tbody ) {
 
 						// String was a <table>, *may* have spurious <tbody>
+						// 首先检测是否含有<tbody>元素
 						var hasBody = rtbody.test(elem),
+						//第一个判断是如果含有table标签,但没有tbody标签,则有可能生成空的tbody,div.firstChild指向table
+						//div.firstChild.childNodes指向<tbody><thead><tfoot>的集合
 							tbody = tag === "table" && !hasBody ?
 								div.firstChild && div.firstChild.childNodes :
 
+								//如果传入的是<thead>或者<tfoot>, 则直接获得childNodes
 								// String was a bare <thead> or <tfoot>
 								wrap[1] === "<table>" && !hasBody ?
 									div.childNodes :
-									[];
+									[];//如果html代码中含有<tbody>,无论是否为空都不需要删除
 
 						for ( j = tbody.length - 1; j >= 0 ; --j ) {
+							//移除空的tbody,首先判断是否是tbody标签,如果是在判断是否为空,如果两者都满足则移除
 							if ( jQuery.nodeName( tbody[ j ], "tbody" ) && !tbody[ j ].childNodes.length ) {
 								tbody[ j ].parentNode.removeChild( tbody[ j ] );
 							}
@@ -6567,14 +6614,18 @@ jQuery.extend({
 					}
 
 					// IE completely kills leading whitespace when innerHTML is used
+					// 插入IE6/7/8自动被剔除前导空白符
+					// 如果元素存在空白的文本节点,则在div的firstChild前插入文本节点
 					if ( !jQuery.support.leadingWhitespace && rleadingWhitespace.test( elem ) ) {
 						div.insertBefore( context.createTextNode( rleadingWhitespace.exec(elem)[0] ), div.firstChild );
 					}
 
+					//取得转换后的DOM元素集合
 					elem = div.childNodes;
 
 					// Clear elements from DocumentFragment (safeFragment or otherwise)
 					// to avoid hoarding elements. Fixes #11356
+					// 移除div,避免没用的元素残留在内存中
 					if ( div ) {
 						div.parentNode.removeChild( div );
 
@@ -6593,6 +6644,7 @@ jQuery.extend({
 			// Resets defaultChecked for any radios and checkboxes
 			// about to be appended to the DOM in IE 6/7 (#8060)
 			var len;
+			//如果是IE6/7,会丢失radio的check状态,这里就会为false,插入之前将checked值赋给defaultChecked可以解决这个问题
 			if ( !jQuery.support.appendChecked ) {
 				if ( elem[0] && typeof (len = elem.length) === "number" ) {
 					for ( j = 0; j < len; j++ ) {
@@ -6603,6 +6655,7 @@ jQuery.extend({
 				}
 			}
 
+			//合并转换后的DOM元素
 			if ( elem.nodeType ) {
 				ret.push( elem );
 			} else {
@@ -6610,6 +6663,7 @@ jQuery.extend({
 			}
 		}
 
+		//如果传入了fragment,则遍历ret数组,提取其中的script元素存入scripts数组,并将其他元素插入fragment
 		if ( fragment ) {
 			checkScriptType = function( elem ) {
 				return !elem.type || rscriptType.test( elem.type );
