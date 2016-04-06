@@ -185,7 +185,6 @@ jQuery.fn = jQuery.prototype = {
 				//这里返回的结果,如果match[1]不是undefined,则说明是HTML标签
 				match = quickExpr.exec( selector );
 			}
-			console.log(match);
 
 			/**
 			 * 验证match,看它是否是HTML标签
@@ -308,57 +307,78 @@ jQuery.fn = jQuery.prototype = {
 	},
 
 	// Start with an empty selector
+	//用于记录jQuery查找\过滤DOM元素时使用的选择器
+	//例如:
+	//    $("#bar").find('.text').selector --> #bar .text
+	//    $(".text").first().selector --> .text.slice(0,1), 很显然是通过.text获得一组DOM元素后取得第一个元素
 	selector: "",
 
 	// The current version of jQuery being used
+	//jquery用于表示正在使用的版本号,可以用于判定一个对象是不是jQuery对象,因为jQuery对象都会包含这个属性
 	jquery: "1.7.2",
 
 	//jQuery是一个类数组对象,像arguments或者NODELIST一样
+	//表示当前jQuery对象中包含的元素个数
 	// The default length of a jQuery object is 0
 	length: 0,
 
 	// The number of elements contained in the matched element set
+	//size的功能和length一样,但应该优先选择length,因为它没有函数开销
 	size: function() {
 		return this.length;
 	},
 
+	//将jQuery对象转换为真正的数组,转换后的数组包含了所有的元素
 	toArray: function() {
+		//Array.prototype.slice.call(a, 0),可以将类数组转换为数组
+		//这样的类数组必须满足包含一个length属性,来在slice时获取类数组的长度
+		//另外类数组的key必须是0,1,2...
 		return slice.call( this, 0 );
 	},
 
 	// Get the Nth element in the matched element set OR
 	// Get the whole matched element set as a clean array
+	// 返回指定位置的元素或者全部元素的数组
 	get: function( num ) {
 		return num == null ?
 
 			// Return a 'clean' array
+			//如果没有传入num, 则调用toArray()方法返回数组
 			this.toArray() :
 
 			// Return just the object
+			//返回特定位置的元素
 			( num < 0 ? this[ this.length + num ] : this[ num ] );
 	},
 
 	// Take an array of elements and push it onto the stack
 	// (returning the new matched element set)
+	//创建一个新的空jQuery对象,然后把DOM元素集合放入这个对象中,并保留对当前jQuery对象的引用
 	pushStack: function( elems, name, selector ) {
 		// Build a new jQuery matched element set
+		//this.constructor=>jQuery
 		var ret = this.constructor();
+		console.log(elems,name,selector);
 
+		//将参数elems合并到ret中
 		if ( jQuery.isArray( elems ) ) {
 			push.apply( ret, elems );
-
 		} else {
 			jQuery.merge( ret, elems );
 		}
 
 		// Add the old object onto the stack (as a reference)
+		//设置一个prevObject属性,指向当前对象,从而形成一个链式栈
 		ret.prevObject = this;
 
+		//设置一个context属性,指向当前对象的上下文
 		ret.context = this.context;
 
 		if ( name === "find" ) {
+			//在新对象上设置selector属性,该属性不一定是一个合法的选择表达式,只是方便调试
 			ret.selector = this.selector + ( this.selector ? " " : "" ) + selector;
 		} else if ( name ) {
+			//其他情况则添加.,比如.not等
 			ret.selector = this.selector + "." + name + "(" + selector + ")";
 		}
 
@@ -373,6 +393,7 @@ jQuery.fn = jQuery.prototype = {
 		return jQuery.each( this, callback, args );
 	},
 
+	//用于绑定ready事件处理程序
 	ready: function( fn ) {
 		// Attach the listeners
 		jQuery.bindReady();
@@ -406,12 +427,15 @@ jQuery.fn = jQuery.prototype = {
 	},
 
 	map: function( callback ) {
+		console.log(callback);
 		return this.pushStack( jQuery.map(this, function( elem, i ) {
 			return callback.call( elem, i, elem );
 		}));
 	},
 
 	end: function() {
+		//结束当前链条中最近的筛选操作,并将匹配元素集合还原为之前的状态
+		//pushStack用于入栈, end用于出栈
 		return this.prevObject || this.constructor(null);
 	},
 
@@ -428,9 +452,16 @@ jQuery.fn.init.prototype = jQuery.fn;
 
 /**
  * 定义jQuery的extend方法, 用于合并两个或多个对象到第一个对象
+ * 语法: extend([deep], target, object1[, objectN])
+ * [deep]表示是否深度合并,默认是非深度合并的
+ * 常用于编写插件和处理函数的参数
+ * 如果只传入一个参数,意味着target被忽略,jQuery或者jQuery.fn作为目标对象,通过这种方式为jQuery或者jQuery.fn添加新的方法或者属性
+ * jQuery的其他模块基本都是这么实现的
  */
 jQuery.extend = jQuery.fn.extend = function() {
+	//由于参数个数不确定,可以是任意多个,因此没有列出可接受的参数
 	var options, name, src, copy, copyIsArray, clone,
+	//修正deep,target以及源对象的起始下标
 		target = arguments[0] || {},
 		i = 1,
 		length = arguments.length,
@@ -438,6 +469,7 @@ jQuery.extend = jQuery.fn.extend = function() {
 
 	// Handle a deep copy situation
 	if ( typeof target === "boolean" ) {
+		//修正deep,target以及源对象的起始下标,注意和没有deep参数的情况的不同之处
 		deep = target;
 		target = arguments[1] || {};
 		// skip the boolean and the target
@@ -445,25 +477,36 @@ jQuery.extend = jQuery.fn.extend = function() {
 	}
 
 	// Handle case when target is a string or something (possible in deep copy)
+	// 如果target既不是对象也不是函数,可能是字符串或者其他基本类型,则统一变成{}
+	// 因为在基本类型上定义属性和方法是无效的
 	if ( typeof target !== "object" && !jQuery.isFunction(target) ) {
 		target = {};
 	}
 
 	// extend jQuery itself if only one argument is passed
+	// 如果只传入了一个参数或者一个布尔值和一个参数, 则将jQuery或者jQuery.fn作为target
+	// 用于向jQuery或者jQuery.fn添加属性和方法
 	if ( length === i ) {
 		target = this;
 		--i;
+		//i减1,将原本作为target的对象改为源对象
 	}
 
+	// 逐个遍历源对象
 	for ( ; i < length; i++ ) {
 		// Only deal with non-null/undefined values
 		if ( (options = arguments[ i ]) != null ) {
+			// 获取源对象,并判断源对象不是null/undefined
 			// Extend the base object
+			//遍历源对象属性
 			for ( name in options ) {
+				//覆盖目标对象的同名属性
 				src = target[ name ];
 				copy = options[ name ];
 
 				// Prevent never-ending loop
+				//如果复制值和target对象相等,则为了避免死循环而不会覆盖目标对象的同名属性
+				//var o = {}; o.n1 = o; $.extend(true, o, {n2: o})会抛出错误:溢出
 				if ( target === copy ) {
 					continue;
 				}
@@ -471,18 +514,23 @@ jQuery.extend = jQuery.fn.extend = function() {
 				// Recurse if we're merging plain objects or arrays
 				if ( deep && copy && ( jQuery.isPlainObject(copy) || (copyIsArray = jQuery.isArray(copy)) ) ) {
 					if ( copyIsArray ) {
+						//如果copy是数组,而源对象同名属性不是数组,则修正为空数组
 						copyIsArray = false;
 						clone = src && jQuery.isArray(src) ? src : [];
 
 					} else {
+						//如果copy是对象,而源对象同名属性不是普通对象,则修正为空对象
+						//所谓plain对象:只有通过{}和new Object()创建的对象才是纯粹的对象
 						clone = src && jQuery.isPlainObject(src) ? src : {};
 					}
 
 					// Never move original objects, clone them
+					//先把复制值copy递归合并到原始值副本clone中,再覆盖目标对象的同名属性
 					target[ name ] = jQuery.extend( deep, clone, copy );
 
 				// Don't bring in undefined values
 				} else if ( copy !== undefined ) {
+					//如果不是深拷贝,直接将源对象的属性复制给目标对象
 					target[ name ] = copy;
 				}
 			}
@@ -497,6 +545,10 @@ jQuery.extend = jQuery.fn.extend = function() {
  * 在jQuery构造函数上定义静态属性和方法, 即扩展了jQuery对象实例
  */
 jQuery.extend({
+	/**
+	 * noConflict:用于释放jQuery对象对全局变量$的控制权
+	 * deep参数可选:用于表示是否释放对全局变量jQuery的控制权
+     */
 	noConflict: function( deep ) {
 		if ( window.$ === jQuery ) {
 			window.$ = _$;
@@ -600,23 +652,35 @@ jQuery.extend({
 	// See test/unit/core.js for details concerning isFunction.
 	// Since version 1.3, DOM methods and functions like alert
 	// aren't supported. They return false on IE (#2968).
+	/**
+	 * 一系列的类型检测
+     */
+	//isFunction,判断传入的参数是否是函数
 	isFunction: function( obj ) {
 		return jQuery.type(obj) === "function";
 	},
 
+	//isArray:判断传入的参数是否是数组
 	isArray: Array.isArray || function( obj ) {
 		return jQuery.type(obj) === "array";
 	},
 
+	//判断传入的对象是否是window对象
 	isWindow: function( obj ) {
+		//window对象有对自己本身的引用属性,如果obj === obj.window,说明是window对象
 		return obj != null && obj == obj.window;
 	},
 
+	//用于判定传入的参数是否为数字
 	isNumeric: function( obj ) {
+		//parseFloat用于解析一个字符串,返回第一个数字,如果在解析过程中出现无效数字的字符串,则返回NaN
+		//isFinite用于判断一个数字是否有限
 		return !isNaN( parseFloat(obj) ) && isFinite( obj );
 	},
 
 	type: function( obj ) {
+		//用于判断参数的内建js类型,如果参数是undefined或者null,则返回"undefined"或"null"
+		//如果为内部对象,则返回对应的字符串名称,否则一律返回object
 		return obj == null ?
 			String( obj ) :
 			class2type[ toString.call(obj) ] || "object";
@@ -627,6 +691,8 @@ jQuery.extend({
 		// Because of IE, we also have to check the presence of the constructor property.
 		// Make sure that DOM nodes and window objects don't pass through, as well
 		//检测是否是一个对象,不能是DOM节点或者window对象,必须是一个普通对象
+		//1.参数可以转化为false;2.Object.prototype.toString.call(obj)返回的不是[object Object]
+		//3.参数obj是DOM元素 4.参数obj是window对象,这四个条件都不符合才能确定是obj
 		if ( !obj || jQuery.type(obj) !== "object" || obj.nodeType || jQuery.isWindow( obj ) ) {
 			return false;
 		}
@@ -635,12 +701,17 @@ jQuery.extend({
 			// Not own constructor property must be Object
 			//hasOwn ==> Object.prototype.hasOwnProperty
 			//这个对象不能有constructor属性
+			//检测对象obj是否由构造函数Object构造
+			//满足下列条件的则认为不是由Object构造的.
+			//1.obj有constructor属性[没有则一定是对象字面量];2.obj的constructor属性是非继承的,说明在构造函数中已经修改了这个属性
+			//3.obj的原型对象不存在isPrototypeOf属性,因为只有Object的原型才有isPrototypeOf
 			if ( obj.constructor &&
 				!hasOwn.call(obj, "constructor") &&
 				!hasOwn.call(obj.constructor.prototype, "isPrototypeOf") ) {
 				return false;
 			}
 		} catch ( e ) {
+			//如果在上述检测过程中出现异常,也应该抛出异常
 			// IE8,9 Will throw exceptions on certain host objects #9897
 			return false;
 		}
@@ -649,12 +720,15 @@ jQuery.extend({
 		// if last one is own, then all properties are own.
 
 		var key;
+		//检查所有的属性是否都是非继承属性,如果没有属性或者属性都是非继承属性,则返回true
+		//有继承属性则返回false
 		for ( key in obj ) {}
 
 		return key === undefined || hasOwn.call( obj, key );
 	},
 
 	isEmptyObject: function( obj ) {
+		//如果对象中有属性,则返回false,如果对象为空,则返回true
 		for ( var name in obj ) {
 			return false;
 		}
@@ -905,6 +979,7 @@ jQuery.extend({
 		}
 
 		// Flatten any nested arrays
+		//使数组扁平化,取消那些嵌套数组
 		return ret.concat.apply( [], ret );
 	},
 
@@ -1034,6 +1109,17 @@ jQuery.extend({
 });
 
 // Populate the class2type map
+/**
+ * 填充class2type数组
+ * class2type["[object Boolean]"] = boolean;
+ * class2type["[object Number]"] = number;
+ * class2type["[object String]"] = string;
+ * class2type["[object Function]"] = function;
+ * class2type["[object Array]"] = array;
+ * class2type["[object Date]"] = date;
+ * class2type["[object RegExp]"] = regexp;
+ * class2type["[object Object]"] = object;
+ */
 jQuery.each("Boolean Number String Function Array Date RegExp Object".split(" "), function(i, name) {
 	class2type[ "[object " + name + "]" ] = name.toLowerCase();
 });
@@ -6560,7 +6646,6 @@ jQuery.extend({
 						div = context.createElement("div"),
 						safeChildNodes = safeFragment.childNodes,
 						remove;
-					console.log(wrap);
 
 					// Append wrapper element to unknown element safe doc fragment
 					//由于获得的safeFragment是基于document的,因此需要首先判断context是不是document的

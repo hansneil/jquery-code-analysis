@@ -5,13 +5,21 @@
     <title>jQuery</title>
 </head>
 <body>
-<div id="bar">
-    <div class="text"></div>
+<div id="bar" class="aaa bbb ccc">
+    <div class="text">1</div>
+    <div class="text">2</div>
+    <div class="text">3</div>
 </div>
+<script>
+    var $ = {
+        name: "neil",
+        code: "200240"
+    };
+</script>
 <script src="jquery-1.7.2.js"></script>
 <script>
-$(function() {
-    /*$('<div/>', {
+/*$(function() {
+    /!*$('<div/>', {
         "class": "text",
         text: "Hello World"
     }).appendTo("body");
@@ -28,26 +36,36 @@ $(function() {
     //ready写法二
     $(function () {
         alert('ready too');
-    })*/
+    })*!/
 
-    /*var jQuery = $("<div></div>");*/
-    /*console.log(jQuery.length)*/
-    /*var bar = document.getElementById("bar");
+    /!*var jQuery = $("<div></div>");*!/
+    /!*console.log(jQuery.length)*!/
+    /!*var bar = document.getElementById("bar");
     $(bar);
     $('.text', bar);
     console.log($('body'));
-    var $bar = $($(bar));*/
+    var $bar = $($(bar));*!/
 
-   /* var $div = $("#div");
+   /!* var $div = $("#div");
     var $divClone = $($div);
-    console.log($divClone.selector)*/
-    /*$(".text");*/
-    /*$('#bar').get(0).style.height= "100px";*/
-    /*$("<div><p>nested tags</p></div>").appendTo($('body'));*/
-    /*$("<td>no</td>");*/
-    var bar = document.getElementById('bar');
-    console.log(bar.type);
-});
+    console.log($divClone.selector)*!/
+    /!*$(".text");*!/
+    /!*$('#bar').get(0).style.height= "100px";*!/
+    /!*$("<div><p>nested tags</p></div>").appendTo($('body'));*!/
+    /!*$("<td>no</td>");*!/
+    /!*var bar = document.getElementById('bar');
+    console.log(bar.type);*!/
+
+    /!*var a = $('.text').map(function(index, item){
+        item.classList.add('texted');
+    });
+    console.log(a);*!/
+    /!*$("#bar").find('.text').first().css('color', 'red')
+            .end().last().css('color', 'red');*!/
+    console.log($('.text').slice(0,2).prevObject);
+});*/
+$.noConflict();
+console.log($.name);
 </script>
 </body>
 </html>
